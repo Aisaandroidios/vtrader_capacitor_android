@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">V Prop - Vtrader</string>
+    <string name="title_activity_main">V Prop - Vtrader</string>
+    <string name="package_name">com.vprop.vtrader.android</string>
+    <string name="custom_url_scheme">com.vprop.vtrader.android</string>
+</resources>
