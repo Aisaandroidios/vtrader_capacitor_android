@@ -1,4 +1,8 @@
+import groovy.json.JsonSlurper
+
 apply plugin: 'com.android.application'
+apply plugin: 'com.google.gms.google-services'
+apply plugin: 'com.google.firebase.crashlytics'
 
 
 def keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -19,6 +23,36 @@ try {
     }
 } catch (Exception ignored) {}
 def safeAppName = appDisplayName.replaceAll("[^A-Za-z0-9._-]", "_")
+def packageJson = [:]
+try {
+    def packageJsonFile = rootProject.file("../package.json")
+    if (packageJsonFile.exists()) {
+        packageJson = new JsonSlurper().parseText(packageJsonFile.text)
+    }
+} catch (Exception ignored) {}
+def packageVersionName = (packageJson.version ?: "1.0.0").toString()
+def resolvedVersionName = (System.getenv("ANDROID_VERSION_NAME") ?: packageVersionName).toString()
+def resolveVersionCode = { String versionName ->
+    def envVersionCode = System.getenv("ANDROID_VERSION_CODE") ?: System.getenv("BUILD_NUMBER")
+    if (envVersionCode) {
+        return envVersionCode.toInteger()
+    }
+
+    def baseVersion = versionName.tokenize("-")[0]
+    def versionParts = baseVersion.tokenize(".").collect { part ->
+        try {
+            return part.toInteger()
+        } catch (Exception ignored) {
+            return 0
+        }
+    }
+    while (versionParts.size() < 3) {
+        versionParts << 0
+    }
+
+    return (versionParts[0] * 1000000) + (versionParts[1] * 1000) + versionParts[2]
+}
+def resolvedVersionCode = resolveVersionCode(resolvedVersionName)
 
 android {
     namespace = "com.vprop.vtrader.android"
@@ -27,8 +61,8 @@ android {
         applicationId "com.vprop.vtrader.android"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode resolvedVersionCode
+        versionName resolvedVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -59,19 +93,18 @@ android {
 }
 
 android.applicationVariants.all { variant ->
-    if (variant.buildType.name == "release") {
-        variant.outputs.all { output ->
-            def verName = variant.versionName
-            def timestamp = new Date().format("yyyyMMdd_HHmm")
-            def filters = []
-            try {
-                if (output.filters != null) {
-                    output.filters.each { f -> if (f != null && f.identifier) filters.add(f.identifier) }
-                }
-            } catch (ignored) {}
-            def suffix = filters.isEmpty() ? "" : ("-" + filters.join("-"))
-            outputFileName = "${safeAppName}-${verName}-${timestamp}${suffix}.apk"
-        }
+    variant.outputs.all { output ->
+        def verName = variant.versionName
+        def verCode = variant.versionCode
+        def timestamp = new Date().format("yyyyMMdd_HHmm")
+        def filters = []
+        try {
+            if (output.filters != null) {
+                output.filters.each { f -> if (f != null && f.identifier) filters.add(f.identifier) }
+            }
+        } catch (ignored) {}
+        def suffix = filters.isEmpty() ? "" : ("-" + filters.join("-"))
+        outputFileName = "${safeAppName}-${variant.name}-${verName}-vc${verCode}-${timestamp}${suffix}.apk"
     }
 }
 
@@ -85,8 +118,9 @@ android.applicationVariants.all { variant ->
                 def files = outDir.listFiles()?.findAll { it.name.toLowerCase().endsWith(".aab") } ?: []
                 files.each { f ->
                     def verName = variant.versionName
+                    def verCode = variant.versionCode
                     def timestamp = new Date().format("yyyyMMdd_HHmm")
-                    def newName = "${safeAppName}-${verName}-${timestamp}.aab"
+                    def newName = "${safeAppName}-${variant.name}-${verName}-vc${verCode}-${timestamp}.aab"
                     f.renameTo(new File(outDir, newName))
                 }
             }
@@ -105,6 +139,9 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation platform('com.google.firebase:firebase-bom:34.11.0')
+    implementation 'com.google.firebase:firebase-analytics'
+    implementation 'com.google.firebase:firebase-crashlytics'
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
@@ -113,12 +150,3 @@ dependencies {
 }
 
 apply from: 'capacitor.build.gradle'
-
-try {
-    def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
-        apply plugin: 'com.google.gms.google-services'
-    }
-} catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
-}

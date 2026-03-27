@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "933317886270",
+    "project_id": "vprop---vtrader",
+    "storage_bucket": "vprop---vtrader.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:933317886270:android:7af5e298916a6e982b2c6f",
+        "android_client_info": {
+          "package_name": "com.vprop.vtrader.android"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCohNPv4AWahapRIgSGuxBqMRtBE4ARQCU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
